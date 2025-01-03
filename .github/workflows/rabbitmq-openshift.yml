@@ -1,0 +1,114 @@
+name: Deploy RabbitMQ to OpenShift
+
+env:
+  OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
+  OPENSHIFT_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}
+  OPENSHIFT_NAMESPACE: "delta-qa"
+  APP_NAME: "rabbitmq"
+  RABBITMQ_PORT: "5672"  # AMQP port for RabbitMQ
+  MANAGEMENT_PORT: "15672"  # Management UI port
+  IMAGE_NAME: "rabbitmq:3-management"
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - staging
+
+jobs:
+  deploy-rabbitmq:
+    name: Deploy RabbitMQ to OpenShift
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Check for required secrets
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const secrets = {
+              OPENSHIFT_SERVER: `${{ secrets.OPENSHIFT_SERVER }}`,
+              OPENSHIFT_TOKEN: `${{ secrets.OPENSHIFT_TOKEN }}`
+            };
+
+            const missingSecrets = Object.entries(secrets).filter(([key, value]) => !value);
+            if (missingSecrets.length > 0) {
+              core.setFailed(`The following secrets are missing: ${missingSecrets.map(([key]) => key).join(', ')}`);
+            }
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install OpenShift CLI
+        uses: redhat-actions/openshift-tools-installer@v1
+        with:
+          oc: 4.10
+
+      - name: Log in to OpenShift
+        uses: redhat-actions/oc-login@v1
+        with:
+          openshift_server_url: ${{ env.OPENSHIFT_SERVER }}
+          openshift_token: ${{ env.OPENSHIFT_TOKEN }}
+          insecure_skip_tls_verify: true
+          namespace: ${{ env.OPENSHIFT_NAMESPACE }}
+
+      - name: Deploy RabbitMQ to OpenShift
+        run: |
+          cat <<EOF | oc apply -n ${{ env.OPENSHIFT_NAMESPACE }} -f -
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: ${{ env.APP_NAME }}
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: ${{ env.APP_NAME }}
+            template:
+              metadata:
+                labels:
+                  app: ${{ env.APP_NAME }}
+              spec:
+                containers:
+                - name: ${{ env.APP_NAME }}
+                  image: ${{ env.IMAGE_NAME }}
+                  ports:
+                  - containerPort: ${{ env.RABBITMQ_PORT }}
+                  - containerPort: ${{ env.MANAGEMENT_PORT }}
+                  env:
+                  - name: RABBITMQ_DEFAULT_USER
+                    value: "user"
+                  - name: RABBITMQ_DEFAULT_PASS
+                    value: "password"
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: ${{ env.APP_NAME }}
+          spec:
+            ports:
+            - name: amqp
+              port: ${{ env.RABBITMQ_PORT }}
+              targetPort: ${{ env.RABBITMQ_PORT }}
+            - name: management
+              port: ${{ env.MANAGEMENT_PORT }}
+              targetPort: ${{ env.MANAGEMENT_PORT }}
+            selector:
+              app: ${{ env.APP_NAME }}
+          ---
+          apiVersion: route.openshift.io/v1
+          kind: Route
+          metadata:
+            name: ${{ env.APP_NAME }}-management
+          spec:
+            to:
+              kind: Service
+              name: ${{ env.APP_NAME }}
+            port:
+              targetPort: management
+          EOF
+
+      - name: Print RabbitMQ Management URL
+        run: |
+          echo "RabbitMQ is deployed and accessible at:"
+          oc get route ${{ env.APP_NAME }}-management -o jsonpath='{.spec.host}'
