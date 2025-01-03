@@ -7,7 +7,7 @@ env:
   APP_NAME: "rabbitmq"
   RABBITMQ_PORT: "5672"  # AMQP port for RabbitMQ
   MANAGEMENT_PORT: "15672"  # Management UI port
-  IMAGE_NAME: "ghcr.io/${{ secrets.GITHUB_ACTOR }}/rabbitmq:3-management"  # GitHub Container Registry path
+  IMAGE_NAME: "ghcr.io/${{ secrets.GHCR_USERNAME }}/rabbitmq:3-management"  # GitHub Container Registry path
 
 on:
   workflow_dispatch:
