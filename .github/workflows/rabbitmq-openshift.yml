@@ -1,4 +1,4 @@
-name: Deploy RabbitMQ to OpenShift via GitHub Container Registry
+name: Deploy RabbitMQ to OpenShift
 
 env:
   OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
@@ -7,7 +7,7 @@ env:
   APP_NAME: "rabbitmq"
   RABBITMQ_PORT: "5672"  # AMQP port for RabbitMQ
   MANAGEMENT_PORT: "15672"  # Management UI port
-  IMAGE_NAME: "ghcr.io/${{ secrets.GHCR_USERNAME }}/rabbitmq:3-management"  # GitHub Container Registry path
+  IMAGE_NAME: "rabbitmq:3-management"
 
 on:
   workflow_dispatch:
@@ -38,15 +38,6 @@ jobs:
 
       - name: Check out repository
         uses: actions/checkout@v4
-
-      - name: Log in to GitHub Container Registry
-        run: echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
-
-      - name: Build RabbitMQ Docker image and push to GitHub Container Registry
-        run: |
-          docker pull quay.io/rabbitmq/rabbitmq:3-management || true
-          docker tag quay.io/rabbitmq/rabbitmq:3-management ${{ env.IMAGE_NAME }}
-          docker push ${{ env.IMAGE_NAME }}
 
       - name: Install OpenShift CLI
         uses: redhat-actions/openshift-tools-installer@v1
