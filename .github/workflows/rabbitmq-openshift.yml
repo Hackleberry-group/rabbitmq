@@ -83,10 +83,6 @@ jobs:
           openshift_token: ${{ env.OPENSHIFT_TOKEN }}
           insecure_skip_tls_verify: true
           namespace: ${{ env.OPENSHIFT_NAMESPACE }}
-        run: |
-          echo "Logging in to OpenShift..."
-          oc whoami  # This will show the logged-in user to confirm successful login
-          echo "Logged in to OpenShift successfully."
 
       - name: Deploy RabbitMQ to OpenShift
         run: |
